@@ -107,8 +107,6 @@ def update_readings():
     try:
         mag = sensor_manager.get_mag()
         grav = sensor_manager.get_grav()
-        calibrated_readings = angles = device.readings.calib_updated.get_calibrated(mag, grav)
-        print(calibrated_readings)
         angles = device.readings.calib_updated.get_angles(mag, grav)
         device.readings.azimuth, device.readings.inclination, device.readings.roll = angles
     except Exception as e:
