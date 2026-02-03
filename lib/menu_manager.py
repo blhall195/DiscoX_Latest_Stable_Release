@@ -252,7 +252,6 @@ menu.show_menu()
 
 
 
-
 # --- Main loop ---
 while True:
     buttons.update()

@@ -4,13 +4,13 @@ time.sleep(0.2)
 import board
 import digitalio
 
-laser_power = digitalio.DigitalInOut(board.A1)
-laser_power.direction = digitalio.Direction.OUTPUT
-laser_power.switch_to_output(True)
+cfg_pin = digitalio.DigitalInOut(board.SCK)
+cfg_pin.direction = digitalio.Direction.INPUT
+cfg_pin.pull = digitalio.Pull.UP  # internal pull-up
 
 pwr_pin = digitalio.DigitalInOut(board.A2)
 pwr_pin.direction = digitalio.Direction.OUTPUT
-pwr_pin.value = False  # sets A1 high
+pwr_pin.value = not cfg_pin.value
 
 ble_status_pin = digitalio.DigitalInOut(board.D11)
 ble_status_pin.direction = digitalio.Direction.INPUT
@@ -80,6 +80,7 @@ class DeviceContext:
         self.ble_readings_transfered_flag = False
         self.last_activity_time = time.monotonic()
         self.purple_latched = False
+        self.last_measurement_time = 0.0
 
         # Buffers for stability checking
         self.azimuth_buffer = []
@@ -215,12 +216,14 @@ async def alert_error(err_code, flashes=4):
         sensor_manager.set_buzzer(True)
         device.buzzer_enabled = False
         sensor_manager.set_laser(True)
+        device.laser_enabled = True
         device.measurement_taken = True
     except Exception as e:
         print(f"[ERROR] alert_error exception: {type(e).__name__}: {e}")
 
 async def handle_success():
     try:
+        device.last_measurement_time = time.monotonic()
         disco_mode.set_green()
         sensor_manager.set_laser(True)
         await asyncio.sleep(0.1)
@@ -349,6 +352,7 @@ async def sensor_read_display_update():
 
                 except Exception as e:
                     print(f"[ERROR] Distance read failed: {type(e).__name__}: {e}")
+                    sensor_manager.reset_laser()
                     await alert_error("ERR")
 
                 else:
@@ -370,6 +374,7 @@ async def sensor_read_display_update():
 
 async def watch_for_button_presses():
     calibrate_button_start = None
+    button2_hold_start = None
     device.laser_on_flag = False
 
     while True:
@@ -379,6 +384,7 @@ async def watch_for_button_presses():
             device.purple_latched = False
             device.last_activity_time = time.monotonic()
             if device.laser_enabled:
+                sensor_manager.set_laser(True)
                 device.current_state = SystemState.TAKING_MEASURMENT
                 device.measurement_taken = False
                 device.laser_enabled = True
@@ -391,19 +397,47 @@ async def watch_for_button_presses():
                 print("System busy, ignoring button press.")
                 device.current_state = SystemState.IDLE
 
-        if button_manager.was_pressed("Button 2"):
+        # Button 2: short press = disco toggle, hold 5s = snake game
+        if button_manager.is_pressed("Button 2"):
             device.last_activity_time = time.monotonic()
-            if device.disco_on:
-                disco_mode.turn_off()
-                device.disco_on = False
-                sensor_manager.set_buzzer(False)
-                sensor_manager.set_laser(False)
-                device.laser_enabled = False
+            if button2_hold_start is None:
+                button2_hold_start = time.monotonic()
             else:
-                sensor_manager.set_buzzer(False)
-                disco_mode.start_disco()
-                device.disco_on = True
-                sensor_manager.set_laser(False)
+                held_time = time.monotonic() - button2_hold_start
+                if held_time >= 5.0 and device.current_state == SystemState.IDLE:
+                    print("Launching Snake Game (Button 2 held 5s)")
+                    sensor_manager.set_laser(False)
+                    disco_mode.turn_off()
+                    device.disco_on = False
+                    from snake import start_snake_game
+                    await start_snake_game(display, button_manager, disco_mode)
+                    button2_hold_start = None
+        else:
+            # Button released - check if it was a short press for disco toggle
+            if button2_hold_start is not None:
+                held_time = time.monotonic() - button2_hold_start
+                if held_time < 5.0:
+                    # Short press - toggle disco mode
+                    if device.disco_on:
+                        disco_mode.turn_off()
+                        device.disco_on = False
+                        sensor_manager.set_buzzer(False)
+                        sensor_manager.set_laser(False)
+                        device.laser_enabled = False
+                    else:
+                        sensor_manager.set_buzzer(False)
+                        disco_mode.start_disco()
+                        device.disco_on = True
+                        sensor_manager.set_laser(False)
+            button2_hold_start = None
+
+        if button_manager.was_pressed("Button 4"):
+            now = time.monotonic()
+            elapsed = now - device.last_measurement_time
+            if elapsed < 1.5:  # 1.5 seconds guard
+                print("Measurement just taken, delaying shutdown")
+                await asyncio.sleep(1.5 - elapsed)
+            pwr_pin.value = False
 
         if button_manager.is_pressed("Button 3"):
             device.last_activity_time = time.monotonic()
@@ -520,7 +554,7 @@ async def auto_switch_off_timeount():
         if now - device.last_activity_time > CONFIG.auto_shutdown_timeout:
             try:
                 print("Inactivity timeout, shutting down device")
-                pwr_pin.value = True  # sets A1 high
+                pwr_pin.value = False  # sets A1 high
                 #insert shutdown code
             except Exception as e:
                 print(f"Error shutting down device: {e}")
