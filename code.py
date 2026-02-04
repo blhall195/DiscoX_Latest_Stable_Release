@@ -8,10 +8,6 @@ cfg_pin = digitalio.DigitalInOut(board.SCK)
 cfg_pin.direction = digitalio.Direction.INPUT
 cfg_pin.pull = digitalio.Pull.UP  # internal pull-up
 
-pwr_pin = digitalio.DigitalInOut(board.A2)
-pwr_pin.direction = digitalio.Direction.OUTPUT
-pwr_pin.value = not cfg_pin.value
-
 ble_status_pin = digitalio.DigitalInOut(board.D11)
 ble_status_pin.direction = digitalio.Direction.INPUT
 ble_status_pin.pull = digitalio.Pull.DOWN
@@ -23,6 +19,11 @@ print("Loading\nPlease wait...")
 
 from calibration_manager import CalibrationFlags
 calibration_flags = CalibrationFlags()
+
+# Setup power pin for LTC2952 shutdown (after CalibrationFlags to avoid conflict with menu_manager)
+pwr_pin = digitalio.DigitalInOut(board.A2)
+pwr_pin.direction = digitalio.Direction.OUTPUT
+pwr_pin.value = not cfg_pin.value
 
 import os
 import asyncio
@@ -410,7 +411,7 @@ async def watch_for_button_presses():
                     disco_mode.turn_off()
                     device.disco_on = False
                     from snake import start_snake_game
-                    await start_snake_game(display, button_manager, disco_mode)
+                    await start_snake_game(display, button_manager, disco_mode, pwr_pin)
                     button2_hold_start = None
         else:
             # Button released - check if it was a short press for disco toggle

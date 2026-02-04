@@ -102,7 +102,7 @@ class SnakeGame:
         self.draw_initial()
 
 
-async def start_snake_game(display_manager, button_manager, disco_mode=None):
+async def start_snake_game(display_manager, button_manager, disco_mode=None, pwr_pin=None):
     """
     Entry point to start the snake game.
     Call this from code.py when button 2 is held for 5 seconds.
@@ -112,6 +112,7 @@ async def start_snake_game(display_manager, button_manager, disco_mode=None):
         display_manager: The DisplayManager instance from code.py
         button_manager: The ButtonManager instance from code.py
         disco_mode: The DiscoMode instance from code.py (optional, for light effects)
+        pwr_pin: The power control pin for LTC2952 shutdown (optional)
     """
     print("\n" + "="*30)
     print("SNAKE GAME")
@@ -142,6 +143,10 @@ async def start_snake_game(display_manager, button_manager, disco_mode=None):
                 disco_mode.turn_off()
             display_manager.display_screen_initialise()
             return
+
+        if button_manager.was_pressed("Button 4") and pwr_pin is not None:
+            print("Power off requested during snake game")
+            pwr_pin.value = False
 
         current_time = time.monotonic()
         if current_time - last_move_time >= move_delay:
