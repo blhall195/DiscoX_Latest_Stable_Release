@@ -101,6 +101,66 @@ class SnakeGame:
         self.display.root_group = splash
         self.draw_initial()
 
+    def show_game_over(self):
+        """Display the game over splash screen with score using pixel art."""
+        # 5x7 pixel font patterns for arcade look (each row is a byte, LSB = left)
+        chars = {
+            'G': [0x0E,0x11,0x01,0x1D,0x11,0x11,0x0E],
+            'A': [0x0E,0x11,0x11,0x1F,0x11,0x11,0x11],
+            'M': [0x11,0x1B,0x15,0x11,0x11,0x11,0x11],
+            'E': [0x1F,0x01,0x01,0x0F,0x01,0x01,0x1F],
+            'O': [0x0E,0x11,0x11,0x11,0x11,0x11,0x0E],
+            'V': [0x11,0x11,0x11,0x11,0x0A,0x0A,0x04],
+            'R': [0x0F,0x11,0x11,0x0F,0x05,0x09,0x11],
+            'S': [0x0E,0x11,0x01,0x0E,0x10,0x11,0x0E],
+            'C': [0x0E,0x11,0x01,0x01,0x01,0x11,0x0E],
+            ':': [0x00,0x04,0x04,0x00,0x04,0x04,0x00],
+            '0': [0x0E,0x11,0x19,0x15,0x13,0x11,0x0E],
+            '1': [0x04,0x06,0x04,0x04,0x04,0x04,0x0E],
+            '2': [0x0E,0x11,0x10,0x0E,0x01,0x01,0x1F],
+            '3': [0x0E,0x11,0x10,0x0C,0x10,0x11,0x0E],
+            '4': [0x08,0x0C,0x0A,0x09,0x1F,0x08,0x08],
+            '5': [0x1F,0x01,0x0F,0x10,0x10,0x11,0x0E],
+            '6': [0x0E,0x01,0x01,0x0F,0x11,0x11,0x0E],
+            '7': [0x1F,0x10,0x08,0x04,0x02,0x02,0x02],
+            '8': [0x0E,0x11,0x11,0x0E,0x11,0x11,0x0E],
+            '9': [0x0E,0x11,0x11,0x1E,0x10,0x10,0x0E],
+            ' ': [0x00,0x00,0x00,0x00,0x00,0x00,0x00],
+        }
+
+        def draw_char(ch, x, y, scale):
+            if ch not in chars:
+                return
+            pattern = chars[ch]
+            for row in range(7):
+                for col in range(5):
+                    if pattern[row] & (1 << col):
+                        for sy in range(scale):
+                            for sx in range(scale):
+                                px = x + col * scale + sx
+                                py = y + row * scale + sy
+                                if 0 <= px < 128 and 0 <= py < 128:
+                                    self.bitmap[px, py] = 1
+
+        def draw_text(text, y, scale):
+            char_w = 5 * scale + scale  # char width + spacing
+            total_w = len(text) * char_w - scale
+            start_x = (128 - total_w) // 2
+            for i, ch in enumerate(text):
+                draw_char(ch, start_x + i * char_w, y, scale)
+
+        # Clear screen
+        for y in range(128):
+            for x in range(128):
+                self.bitmap[x, y] = 0
+
+        # Draw "GAME" and "OVER" with scale 3
+        draw_text("GAME", 20, 3)
+        draw_text("OVER", 50, 3)
+
+        # Draw score with scale 2
+        draw_text("SCORE:" + str(self.score), 95, 2)
+
 
 async def start_snake_game(display_manager, button_manager, disco_mode=None, pwr_pin=None):
     """
@@ -163,8 +223,10 @@ async def start_snake_game(display_manager, button_manager, disco_mode=None, pwr
 
         await asyncio.sleep(0.01)  # Poll buttons at 100Hz for better responsiveness
 
-    # Game Over - flash red 3 times
+    # Game Over - show splash screen and flash red 3 times
     print(f"Game Over! Score: {game.score}")
+    game.show_game_over()
+
     if disco_mode:
         for _ in range(3):
             disco_mode.set_red()
@@ -172,5 +234,6 @@ async def start_snake_game(display_manager, button_manager, disco_mode=None, pwr
             disco_mode.turn_off()
             await asyncio.sleep(0.2)
 
-    await asyncio.sleep(1)
+    # Wait for user to see the game over screen
+    await asyncio.sleep(2)
     display_manager.display_screen_initialise()

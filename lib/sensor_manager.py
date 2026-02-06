@@ -22,8 +22,10 @@ class SensorManager:
         self._grav_history = []  # use a plain list
         self._grav_maxlen = 3    # smoothing window size
 
-        # Initialize mag_sensor
-        self.mag_sensor = rm3100.RM3100_I2C(i2c, i2c_address=0x20, cycle_count=400)
+        # Initialize mag_sensor with DRDY pin for non-blocking reads
+        self.mag_drdy = digitalio.DigitalInOut(board.D9)
+        self.mag_drdy.direction = digitalio.Direction.INPUT
+        self.mag_sensor = rm3100.RM3100_I2C(i2c, i2c_address=0x20, cycle_count=400, drdy_pin=self.mag_drdy)
 
         # Initialize bat_sensor
         self.max17 = adafruit_max1704x.MAX17048(i2c)
