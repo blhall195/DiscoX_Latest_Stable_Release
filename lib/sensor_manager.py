@@ -4,7 +4,7 @@ import time
 import board
 import busio
 import digitalio
-from laser_egismos import Laser
+from laser_egismos import Laser, LaserError
 from adafruit_lsm6ds.ism330dhcx import ISM330DHCX
 import rm3100
 import adafruit_max1704x
@@ -37,6 +37,8 @@ class SensorManager:
         """Get the current distance reading from the laser, with error handling."""
         try:
             return self.laser.distance
+        except LaserError:
+            raise  # Let laser-specific errors propagate for display handling
         except Exception as e:
             print(f"Error reading distance: {e}")
             return "Err"
