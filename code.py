@@ -45,6 +45,7 @@ sensor_manager.set_laser(True)
 sensor_manager.set_buzzer(True)
 button_manager = ButtonManager()
 ble = BleManager()
+ble.set_name("SAP6_Unicorn")
 disco_mode = DiscoMode(sensor_manager, brightness=1)
 time.sleep(0.05)#prevents brownout
 display.display_screen_initialise()
@@ -510,7 +511,7 @@ async def monitor_ble_pin():
                 display.update_BT_number(0)
                 device.ble_disconnection_counter = 0
             else:
-                display.update_BT_number("...")
+                display.update_BT_number("")
         else:
             display.update_BT_number(device.ble_disconnection_counter)
         last_connected = current_connected
